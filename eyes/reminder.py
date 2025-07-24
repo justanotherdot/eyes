@@ -2,6 +2,7 @@ import time
 import threading
 import platform
 import sys
+import signal
 
 
 class EyeBreakReminder:
@@ -14,6 +15,10 @@ class EyeBreakReminder:
 
         print(f"Reminder interval: {interval_minutes} minutes")
         print(f"Snooze duration: {snooze_minutes} minutes")
+        
+        # Set up signal handlers
+        signal.signal(signal.SIGUSR1, self._signal_show_reminder)
+        signal.signal(signal.SIGTERM, self._signal_shutdown)
 
         if self.system == "Windows":
             self.setup_windows_notifications()
@@ -169,6 +174,18 @@ class EyeBreakReminder:
         except KeyboardInterrupt:
             print("\nShutting down Eye Break Reminder...")
             self.should_run = False
+    
+    def _signal_show_reminder(self, signum, frame):
+        """Signal handler for SIGUSR1 - show immediate reminder"""
+        print("Received signal to show reminder")
+        # Force reset active state and show reminder
+        self.is_reminder_active = False
+        self._show_break_reminder()
+    
+    def _signal_shutdown(self, signum, frame):
+        """Signal handler for SIGTERM - graceful shutdown"""
+        print("Received shutdown signal")
+        self.should_run = False
 
 
 class SimpleEyeBreakReminder:
@@ -184,6 +201,10 @@ class SimpleEyeBreakReminder:
         self.is_active = False
         self.should_run = True
         self.interval_minutes = interval_minutes
+        
+        # Set up signal handlers
+        signal.signal(signal.SIGUSR1, self._signal_show_reminder)
+        signal.signal(signal.SIGTERM, self._signal_shutdown)
 
     def show_reminder(self):
         if self.is_active:
@@ -216,3 +237,15 @@ class SimpleEyeBreakReminder:
         except KeyboardInterrupt:
             print("\nShutting down...")
             self.should_run = False
+    
+    def _signal_show_reminder(self, signum, frame):
+        """Signal handler for SIGUSR1 - show immediate reminder"""
+        print("Received signal to show reminder")
+        # Force reset active state and show reminder
+        self.is_active = False
+        self.show_reminder()
+    
+    def _signal_shutdown(self, signum, frame):
+        """Signal handler for SIGTERM - graceful shutdown"""
+        print("Received shutdown signal")
+        self.should_run = False
