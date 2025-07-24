@@ -1,0 +1,19 @@
+#!/bin/sh -eu
+
+# PyInstaller can't detect plyer's dynamic platform imports  
+# Include all missing pyobjus modules for macOS notifications
+uv run pyinstaller --onefile --console --name eyes \
+  --paths eyes \
+  --add-data assets:assets \
+  --hidden-import plyer.platforms.macosx.notification \
+  --hidden-import plyer.platforms.win.notification \
+  --hidden-import pyobjus \
+  --hidden-import pyobjus.ObjcException \
+  --hidden-import pyobjus.autoclass \
+  --hidden-import pyobjus.dprint \
+  --hidden-import pyobjus.ObjcBOOL \
+  --hidden-import pyobjus.objc_str \
+  --hidden-import pyobjus.protocol \
+  --collect-all pyobjus \
+  --osx-bundle-identifier com.eyes \
+  eyes/cli.py

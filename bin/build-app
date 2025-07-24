@@ -1,0 +1,68 @@
+#!/bin/sh -eu
+
+# Build macOS app bundle with pex
+
+echo "Building Eyes.app..."
+
+# Clean previous build
+rm -rf Eyes.app eyes.pex 2>/dev/null || true
+
+# Create pex
+echo "Creating pex executable..."
+uv run pex . -e eyes.cli:main -o eyes.pex --python-shebang '/usr/bin/env python3'
+
+# Create app bundle structure
+echo "Creating app bundle..."
+mkdir -p Eyes.app/Contents/{MacOS,Resources}
+
+# Copy pex
+cp eyes.pex Eyes.app/Contents/Resources/
+
+# Create Info.plist
+cat > Eyes.app/Contents/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Eyes</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.eyes</string>
+    <key>CFBundleName</key>
+    <string>Eyes</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+# Create executable script
+cat > Eyes.app/Contents/MacOS/Eyes << 'EOF'
+#!/bin/sh
+# macOS app wrapper for Eyes pex
+
+# Get the directory containing this script
+DIR="$(dirname "$0")"
+RESOURCES="$DIR/../Resources"
+
+# Execute the pex with all arguments passed through
+exec "$RESOURCES/eyes.pex" "$@"
+EOF
+
+# Make executable
+chmod +x Eyes.app/Contents/MacOS/Eyes
+
+# Clean up temporary pex
+rm eyes.pex
+
+echo "✅ Eyes.app created successfully!"
+echo "Test with: ./Eyes.app/Contents/MacOS/Eyes --test"
+echo "Or drag Eyes.app to Applications folder"

@@ -1,0 +1,9 @@
+#!/bin/sh
+# macOS app wrapper for Eyes pex
+
+# Get the directory containing this script
+DIR="$(dirname "$0")"
+RESOURCES="$DIR/../Resources"
+
+# Execute the pex with all arguments passed through
+exec "$RESOURCES/eyes.pex" "$@"

@@ -1,0 +1,34 @@
+#!/bin/sh -eu
+
+# Install eyes as a macOS Launch Agent for auto-start on login
+
+EYES_PATH="$(pwd)/dist/eyes"
+PLIST_NAME="com.eyes.plist"
+PLIST_DIR="$HOME/Library/LaunchAgents"
+PLIST_PATH="$PLIST_DIR/$PLIST_NAME"
+
+# Check if binary exists
+if [ ! -f "$EYES_PATH" ]; then
+    echo "Error: eyes binary not found at $EYES_PATH"
+    echo "Run './bin/build' first to create the binary"
+    exit 1
+fi
+
+# Create LaunchAgents directory if it doesn't exist
+mkdir -p "$PLIST_DIR"
+
+# Create plist with correct path
+sed "s|EYES_PATH_PLACEHOLDER|$EYES_PATH|g" scripts/com.eyes.plist > "$PLIST_PATH"
+
+# Load the launch agent
+launchctl load "$PLIST_PATH"
+
+echo "Eyes installed as Launch Agent!"
+echo "It will start automatically on login with 20-minute intervals."
+echo ""
+echo "To uninstall:"
+echo "  launchctl unload '$PLIST_PATH'"
+echo "  rm '$PLIST_PATH'"
+echo ""
+echo "To check status:"
+echo "  launchctl list | grep com.eyes"
