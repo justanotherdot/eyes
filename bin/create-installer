@@ -1,0 +1,131 @@
+#!/bin/sh -eu
+
+# Create a distributable installer package for Eyes
+
+DIST_DIR="eyes-installer"
+VERSION="1.0.0"
+
+echo "Creating Eyes installer package..."
+
+# Clean previous build
+rm -rf "$DIST_DIR" eyes.pex 2>/dev/null || true
+
+# Create pex
+echo "Building pex executable..."
+uv run pex . -e eyes.cli:entry_point -o eyes.pex --python-shebang '/usr/bin/env python3'
+
+# Create installer directory structure
+mkdir -p "$DIST_DIR"
+
+# Copy files
+cp eyes.pex "$DIST_DIR/"
+cp scripts/com.eyes.plist "$DIST_DIR/"
+cp bin/eyes-control "$DIST_DIR/"
+
+# Create install script
+cat > "$DIST_DIR/install" << 'EOF'
+#!/bin/sh -eu
+
+# Eyes - Eye Break Reminder Installer
+
+INSTALL_DIR="$HOME/.local/share/eyes"
+PLIST_DIR="$HOME/Library/LaunchAgents"
+PLIST_PATH="$PLIST_DIR/com.eyes.plist"
+
+echo "Installing Eyes Eye Break Reminder..."
+
+# Create install directory
+mkdir -p "$INSTALL_DIR"
+
+# Copy files
+cp eyes.pex "$INSTALL_DIR/"
+cp eyes-control "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/eyes-control"
+
+# Create LaunchAgents directory if needed
+mkdir -p "$PLIST_DIR"
+
+# Install plist with correct path
+sed "s|EYES_PATH_PLACEHOLDER|$INSTALL_DIR|g" com.eyes.plist > "$PLIST_PATH"
+
+# Load launch agent
+launchctl load "$PLIST_PATH"
+
+echo "✅ Eyes installed successfully!"
+echo ""
+echo "Eyes will now run in the background and remind you every 20 minutes."
+echo ""
+echo "Commands:"
+echo "  $INSTALL_DIR/eyes-control show   - Show immediate reminder"
+echo "  $INSTALL_DIR/eyes-control stop   - Stop the service"
+echo "  $INSTALL_DIR/eyes-control status - Check if running"
+echo ""
+echo "To uninstall, run: ./uninstall"
+EOF
+
+# Create uninstall script
+cat > "$DIST_DIR/uninstall" << 'EOF'
+#!/bin/sh -eu
+
+# Eyes - Eye Break Reminder Uninstaller
+
+INSTALL_DIR="$HOME/.local/share/eyes"
+PLIST_PATH="$HOME/Library/LaunchAgents/com.eyes.plist"
+
+echo "Uninstalling Eyes Eye Break Reminder..."
+
+# Stop and remove launch agent
+if [ -f "$PLIST_PATH" ]; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    rm "$PLIST_PATH"
+fi
+
+# Remove installed files
+if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+fi
+
+echo "✅ Eyes uninstalled successfully!"
+EOF
+
+# Make scripts executable
+chmod +x "$DIST_DIR/install" "$DIST_DIR/uninstall"
+
+# Create README
+cat > "$DIST_DIR/README.txt" << EOF
+Eyes - Eye Break Reminder v$VERSION
+
+A simple eye break reminder that follows the 20-20-20 rule:
+Every 20 minutes, look at something 20 feet away for 20 seconds.
+
+INSTALLATION:
+1. Run: ./install
+2. Eyes will start automatically and run in the background
+
+USAGE:
+- Eyes runs silently in the background
+- You'll get notifications every 20 minutes
+- Use ./eyes-control commands for manual control
+
+REQUIREMENTS:
+- macOS 10.15 or later
+- Python 3 (included with macOS)
+
+UNINSTALL:
+Run: ./uninstall
+
+For support: https://github.com/justanotherdot/eyes
+EOF
+
+# Clean up
+rm eyes.pex
+
+echo "✅ Installer package created: $DIST_DIR/"
+echo ""
+echo "To distribute:"
+echo "  tar -czf eyes-$VERSION.tar.gz $DIST_DIR"
+echo ""
+echo "Users install with:"
+echo "  tar -xzf eyes-$VERSION.tar.gz"
+echo "  cd $DIST_DIR"
+echo "  ./install"

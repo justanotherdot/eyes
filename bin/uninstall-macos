@@ -1,0 +1,22 @@
+#!/bin/sh -eu
+
+# Uninstall eyes macOS Launch Agent
+
+PLIST_NAME="com.eyes.plist"
+PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_NAME"
+
+if [ -f "$PLIST_PATH" ]; then
+    echo "Unloading Launch Agent..."
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    
+    echo "Removing plist file..."
+    rm "$PLIST_PATH"
+    
+    echo "Eyes Launch Agent uninstalled successfully!"
+else
+    echo "Eyes Launch Agent not found - nothing to uninstall"
+fi
+
+echo ""
+echo "To check if any instances are still running:"
+echo "  launchctl list | grep com.eyes"

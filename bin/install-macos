@@ -2,15 +2,14 @@
 
 # Install eyes as a macOS Launch Agent for auto-start on login
 
-EYES_PATH="$(pwd)/dist/eyes"
+PROJECT_DIR="$(pwd)"
 PLIST_NAME="com.eyes.plist"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 PLIST_PATH="$PLIST_DIR/$PLIST_NAME"
 
-# Check if binary exists
-if [ ! -f "$EYES_PATH" ]; then
-    echo "Error: eyes binary not found at $EYES_PATH"
-    echo "Run './bin/build' first to create the binary"
+# Check if we're in the project directory
+if [ ! -f "pyproject.toml" ]; then
+    echo "Error: Run this script from the eyes project directory"
     exit 1
 fi
 
@@ -18,7 +17,7 @@ fi
 mkdir -p "$PLIST_DIR"
 
 # Create plist with correct path
-sed "s|EYES_PATH_PLACEHOLDER|$EYES_PATH|g" scripts/com.eyes.plist > "$PLIST_PATH"
+sed "s|EYES_PATH_PLACEHOLDER|$PROJECT_DIR|g" scripts/com.eyes.plist > "$PLIST_PATH"
 
 # Load the launch agent
 launchctl load "$PLIST_PATH"

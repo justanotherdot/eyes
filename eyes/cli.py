@@ -2,14 +2,12 @@ import argparse
 import sys
 import time
 
-try:
-    from .reminder import EyeBreakReminder, SimpleEyeBreakReminder
-except ImportError:
-    from reminder import EyeBreakReminder, SimpleEyeBreakReminder
+from .reminder import EyeBreakReminder, SimpleEyeBreakReminder
 
 
 def main():
     """Main function with command line argument support"""
+    
     parser = argparse.ArgumentParser(
         description="Eyes - Configurable eye break reminder following the 20-20-20 rule"
     )
@@ -119,8 +117,9 @@ def interactive_main():
     app.run()
 
 
+def entry_point():
+    """Main entry point"""
+    main()
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        main()
-    else:
-        interactive_main()
+    entry_point()

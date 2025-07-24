@@ -33,6 +33,7 @@ keywords = ["eye-strain", "break-reminder", "20-20-20", "productivity", "health"
 dependencies = [
     "plyer>=2.0",
     "pyobjus>=1.2.3",
+    "rumps>=0.4.0",
 ]
 
 [project.optional-dependencies]
@@ -51,7 +52,7 @@ Repository = "https://github.com/justanotherdot/eyes"
 Issues = "https://github.com/justanotherdot/eyes/issues"
 
 [project.scripts]
-eyes = "eyes.cli:main"
+eyes = "eyes.cli:entry_point"
 
 [tool.hatch.build.targets.wheel]
 packages = ["eyes"]
@@ -61,7 +62,6 @@ dev-dependencies = [
     "pytest>=7.0.0",
     "black>=22.0.0",
     "ruff>=0.1.0",
-    "pyinstaller>=5.0.0",
     "pex>=2.47.0",
 ]
 
