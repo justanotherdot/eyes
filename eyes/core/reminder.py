@@ -2,6 +2,8 @@ import time
 import threading
 import signal
 import abc
+import os
+import atexit
 
 
 class BaseReminder(abc.ABC):
@@ -11,8 +13,12 @@ class BaseReminder(abc.ABC):
         self.interval_minutes = interval_minutes
         self.should_run = True
         self.is_active = False
+        self.pidfile = "/tmp/eyes.pid"
         
         print(f"Reminder interval: {interval_minutes} minutes")
+        
+        # Create pidfile
+        self._create_pidfile()
         
         # Set up signal handlers for IPC control
         signal.signal(signal.SIGUSR1, self._signal_show_reminder)
@@ -53,6 +59,23 @@ class BaseReminder(abc.ABC):
         """Signal handler for SIGTERM - graceful shutdown"""
         print("Received shutdown signal")
         self.should_run = False
+    
+    def _create_pidfile(self):
+        """Create pidfile with current process ID"""
+        try:
+            with open(self.pidfile, "w") as f:
+                f.write(str(os.getpid()))
+            # Register cleanup on exit
+            atexit.register(self._cleanup_pidfile)
+        except OSError as e:
+            print(f"Warning: Could not create pidfile {self.pidfile}: {e}")
+    
+    def _cleanup_pidfile(self):
+        """Remove pidfile"""
+        try:
+            os.unlink(self.pidfile)
+        except OSError:
+            pass  # File might already be gone
     
     def run(self):
         """Main reminder loop"""

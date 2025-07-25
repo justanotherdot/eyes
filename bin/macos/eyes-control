@@ -13,11 +13,28 @@ show_usage() {
 }
 
 get_eyes_pid() {
-    # Get PID from launchctl or fallback to pgrep
-    PID=$(launchctl list | grep com.eyes | awk '{print $1}' 2>/dev/null || echo "")
-    if [ -z "$PID" ] || [ "$PID" = "-" ]; then
-        PID=$(pgrep -f "eyes.*--interval" 2>/dev/null || echo "")
+    # Try pidfile first
+    if [ -f "/tmp/eyes.pid" ]; then
+        PID=$(cat /tmp/eyes.pid 2>/dev/null)
+        # Validate PID is still running
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            echo "$PID"
+            return
+        else
+            # Clean up stale pidfile
+            rm -f /tmp/eyes.pid
+        fi
     fi
+    
+    # Fallback to launchctl
+    PID=$(launchctl list | grep com.eyes | awk '{print $1}' 2>/dev/null || echo "")
+    if [ -n "$PID" ] && [ "$PID" != "-" ]; then
+        echo "$PID"
+        return
+    fi
+    
+    # Last resort: process search
+    PID=$(pgrep -f "eyes.*--interval" 2>/dev/null || echo "")
     echo "$PID"
 }
 

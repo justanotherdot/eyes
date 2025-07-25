@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v4
+    
+    - name: Build installer
+      run: |
+        uv sync
+        ./bin/installers/create-installer
+        HASH=$(git rev-parse --short HEAD)
+        tar -czf eyes-$HASH.tar.gz eyes-installer
+    
+    - name: Publish to GitHub Packages
+      run: |
+        HASH=$(git rev-parse --short HEAD)
+        echo "FROM scratch" > Dockerfile
+        echo "COPY eyes-$HASH.tar.gz /" >> Dockerfile
+        
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        docker build -t ghcr.io/${{ github.repository_owner }}/eyes:$HASH .
+        docker tag ghcr.io/${{ github.repository_owner }}/eyes:$HASH ghcr.io/${{ github.repository_owner }}/eyes:latest
+        docker push ghcr.io/${{ github.repository_owner }}/eyes:$HASH
+        docker push ghcr.io/${{ github.repository_owner }}/eyes:latest
+    
+    - name: Cleanup old versions
+      uses: actions/delete-package-versions@v5
+      with:
+        package-name: eyes
+        package-type: container
+        min-versions-to-keep: 5
+      continue-on-error: true

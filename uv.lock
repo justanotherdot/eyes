@@ -149,6 +149,7 @@ name = "eyes"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "pex" },
     { name = "plyer" },
     { name = "pyobjus" },
     { name = "rumps" },
@@ -168,7 +169,6 @@ windows = [
 dev = [
     { name = "black", version = "24.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "black", version = "25.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
-    { name = "pex" },
     { name = "pytest", version = "8.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pytest", version = "8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "ruff" },
@@ -176,6 +176,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "pex", specifier = ">=2.47.0" },
     { name = "plyer", specifier = ">=2.0" },
     { name = "pync", marker = "extra == 'macos'", specifier = ">=2.0.0" },
     { name = "pyobjus", specifier = ">=1.2.3" },
@@ -189,7 +190,6 @@ provides-extras = ["windows", "macos"]
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=22.0.0" },
-    { name = "pex", specifier = ">=2.47.0" },
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
 ]
