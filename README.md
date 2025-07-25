@@ -1,79 +1,110 @@
 # Eyes
 
-A configurable eye break reminder following the 20-20-20 rule.
+A configurable eye break reminder following the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds.
 
-## Quick install (binary)
+## Features
 
-Download the latest binary from releases and run:
+- **Cross-platform**: macOS and Windows support
+- **Background service**: Runs quietly without dock/taskbar presence  
+- **Runtime control**: Signal-based IPC for immediate notifications and shutdown
+- **Professional installers**: Native .pkg (macOS) and GUI installers
+- **Flexible timing**: Configurable intervals and snooze duration
 
+## Quick install
+
+### macOS
+Download and run the installer:
 ```bash
-# macOS/Linux
-./eyes
+# GUI installer (recommended)
+./bin/installers/create-pkg-installer  # Creates Eyes-1.0.0.pkg
+# Double-click Eyes-1.0.0.pkg
 
-# Windows
-eyes.exe
+# Command-line installer
+./bin/installers/create-installer      # Creates eyes-installer/
+cd eyes-installer && ./install
 ```
 
-## Build from source
+### Windows  
+```bash
+./bin/installers/create-installer      # Creates eyes-installer/
+cd eyes-installer && ./install
+```
+
+## Development setup
 
 ```bash
 # Install uv (fast Python package manager)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies and build
+# Install dependencies  
 uv sync --dev
-./bin/build
 
-# Run the binary
-./dist/eyes --help
+# Run directly
+uv run eyes --test
 ```
 
-## Install as startup service
+## Platform services
 
-### macOS
+### macOS Launch Agent
 ```bash
-# After building, install as Launch Agent (auto-starts on login)
-./bin/install-macos
+# Install background service (auto-starts on login)
+./bin/macos/install-macos
 
-# To uninstall
-launchctl unload ~/Library/LaunchAgents/com.eyes.plist
-rm ~/Library/LaunchAgents/com.eyes.plist
+# Control running service
+./bin/macos/eyes-control show    # Immediate notification
+./bin/macos/eyes-control stop    # Stop service
+./bin/macos/eyes-control status  # Check status
+
+# Uninstall
+./bin/macos/uninstall-macos
 ```
 
-### Windows
+### Windows startup
 ```powershell
-# After building, install to startup folder (auto-starts on login)
-./bin/install-windows.ps1
-
-# Custom interval
-./bin/install-windows.ps1 -Interval 30
-
-# To uninstall
-Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\eyes-startup.bat"
+./bin/windows/install-windows.ps1
 ```
 
 ## Usage
 
 ```bash
-eyes                    # Interactive setup
-eyes -i 20              # Every 20 minutes  
-eyes -i 25 -s 5         # Pomodoro (25 min work, 5 min break)
-eyes --simple           # Simple notifications
-eyes --test             # Test notification
+# Basic usage
+uv run eyes                    # Default 20-minute intervals
+uv run eyes -i 30              # Every 30 minutes  
+uv run eyes -i 25 -s 5         # Advanced with snooze (25 min work, 5 min snooze)
+uv run eyes --simple -i 45     # Simple notifications, no snooze
+uv run eyes --test             # Test notification immediately
+```
+
+## Architecture
+
+```
+eyes/
+├── core/           # Platform-agnostic reminder logic
+│   └── reminder.py # BaseReminder, AdvancedReminder classes
+├── platforms/      # Platform-specific implementations
+│   ├── macos/      # macOS notifications, Launch Agent config
+│   └── windows/    # Windows notifications, startup scripts
+├── reminders.py    # Platform detection and reminder creation
+└── cli.py          # Command-line interface
+
+bin/
+├── macos/          # macOS utilities (eyes-control, install/uninstall)  
+├── windows/        # Windows utilities
+└── installers/     # Cross-platform installer builders
 ```
 
 ## Examples
 
 ```bash
-# Pomodoro technique (25 min work, 5 min break)
-eyes -i 25 -s 5
+# Pomodoro technique (25 min work, 5 min snooze)
+uv run eyes -i 25 -s 5
 
 # Hourly reminders  
-eyes -i 60
+uv run eyes -i 60
 
 # Frequent reminders for intensive work
-eyes -i 10 -s 2
+uv run eyes -i 10 -s 2
 
-# Simple notifications every 45 minutes
-eyes --simple -i 45
+# Simple notifications every 45 minutes (no advanced features)
+uv run eyes --simple -i 45
 ```
