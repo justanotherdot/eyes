@@ -2,7 +2,7 @@ import argparse
 import sys
 import time
 
-from .reminder import EyeBreakReminder, SimpleEyeBreakReminder
+from .reminders import create_reminder
 
 
 def main():
@@ -45,19 +45,16 @@ def main():
         print("Error: Snooze duration must be at least 1 minute")
         sys.exit(1)
 
-    if args.simple:
-        app = SimpleEyeBreakReminder(interval_minutes=args.interval)
-    else:
-        app = EyeBreakReminder(
-            interval_minutes=args.interval, snooze_minutes=args.snooze
-        )
+    # Create appropriate reminder for platform
+    app = create_reminder(
+        advanced=not args.simple,
+        interval_minutes=args.interval,
+        snooze_minutes=args.snooze
+    )
 
     if args.test:
         print("Test mode - showing notification now...")
-        if hasattr(app, '_show_break_reminder'):
-            app._show_break_reminder()
-        else:
-            app.show_reminder()
+        app.show_reminder()
         time.sleep(2)
         return
 

@@ -17,7 +17,7 @@ fi
 mkdir -p "$PLIST_DIR"
 
 # Create plist with correct path
-sed "s|EYES_PATH_PLACEHOLDER|$PROJECT_DIR|g" scripts/com.eyes.plist > "$PLIST_PATH"
+sed "s|EYES_PATH_PLACEHOLDER|$PROJECT_DIR|g" eyes/platforms/macos/com.eyes.plist > "$PLIST_PATH"
 
 # Load the launch agent
 launchctl load "$PLIST_PATH"
