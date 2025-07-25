@@ -1,0 +1,293 @@
+#!/bin/sh -eu
+
+# Create a GUI-based macOS installer
+
+DIST_DIR="eyes-gui-installer"
+VERSION="1.0.0"
+
+echo "Creating Eyes GUI installer..."
+
+# Clean previous build
+rm -rf "$DIST_DIR" eyes.pex 2>/dev/null || true
+
+# Create pex
+echo "Building pex executable..."
+uv run pex . -e eyes.cli:entry_point -o eyes.pex --python-shebang '/usr/bin/env python3'
+
+# Create installer directory structure
+mkdir -p "$DIST_DIR"
+
+# Copy files
+cp eyes.pex "$DIST_DIR/"
+cp scripts/com.eyes.plist "$DIST_DIR/"
+cp bin/eyes-control "$DIST_DIR/"
+
+# Create GUI installer script
+cat > "$DIST_DIR/install-gui" << 'EOF'
+#!/bin/sh -eu
+
+# Eyes GUI Installer
+
+# Check if running with GUI (not from terminal)
+if [ -t 1 ]; then
+    # Running from terminal, show instructions
+    echo "Eyes GUI Installer"
+    echo "=================="
+    echo ""
+    echo "To run the GUI installer, double-click this file in Finder"
+    echo "or run: open install-gui"
+    echo ""
+    echo "For command-line installation, use: ./install"
+    exit 0
+fi
+
+# GUI Installation Process
+INSTALL_DIR="$HOME/.local/share/eyes"
+PLIST_DIR="$HOME/Library/LaunchAgents"
+PLIST_PATH="$PLIST_DIR/com.eyes.plist"
+
+# Get the directory containing this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Welcome dialog
+osascript << 'APPLESCRIPT'
+display dialog "Welcome to Eyes - Eye Break Reminder
+
+This installer will set up Eyes to run automatically in the background and remind you to take eye breaks every 20 minutes.
+
+Eyes follows the 20-20-20 rule:
+• Every 20 minutes
+• Look at something 20 feet away  
+• For 20 seconds
+
+Click Continue to install." buttons {"Cancel", "Continue"} default button "Continue" with title "Eyes Installer" with icon note
+
+if button returned of result is "Cancel" then
+    error number -128
+end if
+APPLESCRIPT
+
+if [ $? -ne 0 ]; then
+    exit 0
+fi
+
+# Installation progress
+osascript << 'APPLESCRIPT'
+display dialog "Installing Eyes...
+
+This will:
+• Install Eyes to ~/.local/share/eyes
+• Set up automatic startup
+• Start the background service
+
+Installation will complete in a few seconds." buttons {"OK"} default button "OK" with title "Eyes Installer" with icon note giving up after 3
+APPLESCRIPT
+
+# Perform installation
+mkdir -p "$INSTALL_DIR"
+cp "$SCRIPT_DIR/eyes.pex" "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/eyes-control" "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/eyes-control"
+
+mkdir -p "$PLIST_DIR"
+sed "s|EYES_PATH_PLACEHOLDER|$INSTALL_DIR|g" "$SCRIPT_DIR/com.eyes.plist" > "$PLIST_PATH"
+
+# Load launch agent
+launchctl load "$PLIST_PATH" 2>/dev/null || true
+
+# Success dialog
+osascript << APPLESCRIPT
+display dialog "✅ Eyes installed successfully!
+
+Eyes is now running in the background and will remind you every 20 minutes to take an eye break.
+
+Control commands:
+• Show reminder now: $INSTALL_DIR/eyes-control show
+• Stop service: $INSTALL_DIR/eyes-control stop  
+• Check status: $INSTALL_DIR/eyes-control status
+
+To uninstall, run the uninstall script." buttons {"Open Control Folder", "Done"} default button "Done" with title "Eyes Installer" with icon note
+
+if button returned of result is "Open Control Folder" then
+    tell application "Finder" to open folder POSIX file "$INSTALL_DIR"
+end if
+APPLESCRIPT
+
+EOF
+
+# Create command-line installer (same as before)
+cat > "$DIST_DIR/install" << 'EOF'
+#!/bin/sh -eu
+
+# Eyes - Eye Break Reminder Installer
+
+INSTALL_DIR="$HOME/.local/share/eyes"
+PLIST_DIR="$HOME/Library/LaunchAgents"
+PLIST_PATH="$PLIST_DIR/com.eyes.plist"
+
+echo "Installing Eyes Eye Break Reminder..."
+
+# Create install directory
+mkdir -p "$INSTALL_DIR"
+
+# Copy files
+cp eyes.pex "$INSTALL_DIR/"
+cp eyes-control "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/eyes-control"
+
+# Create LaunchAgents directory if needed
+mkdir -p "$PLIST_DIR"
+
+# Install plist with correct path
+sed "s|EYES_PATH_PLACEHOLDER|$INSTALL_DIR|g" com.eyes.plist > "$PLIST_PATH"
+
+# Load launch agent
+launchctl load "$PLIST_PATH"
+
+echo "✅ Eyes installed successfully!"
+echo ""
+echo "Eyes will now run in the background and remind you every 20 minutes."
+echo ""
+echo "Commands:"
+echo "  $INSTALL_DIR/eyes-control show   - Show immediate reminder"
+echo "  $INSTALL_DIR/eyes-control stop   - Stop the service"
+echo "  $INSTALL_DIR/eyes-control status - Check if running"
+echo ""
+echo "To uninstall, run: ./uninstall"
+EOF
+
+# Create GUI uninstaller
+cat > "$DIST_DIR/uninstall-gui" << 'EOF'
+#!/bin/sh -eu
+
+# Eyes GUI Uninstaller
+
+INSTALL_DIR="$HOME/.local/share/eyes"
+PLIST_PATH="$HOME/Library/LaunchAgents/com.eyes.plist"
+
+# Check if running with GUI
+if [ -t 1 ]; then
+    echo "Eyes GUI Uninstaller"
+    echo "==================="
+    echo ""
+    echo "To run the GUI uninstaller, double-click this file in Finder"
+    echo "or run: open uninstall-gui"
+    echo ""
+    echo "For command-line uninstallation, use: ./uninstall"
+    exit 0
+fi
+
+# Confirmation dialog
+osascript << 'APPLESCRIPT'
+display dialog "Are you sure you want to uninstall Eyes?
+
+This will:
+• Stop the background service
+• Remove all Eyes files
+• Remove automatic startup
+
+You can reinstall Eyes anytime by running the installer again." buttons {"Cancel", "Uninstall"} default button "Cancel" with title "Eyes Uninstaller" with icon caution
+
+if button returned of result is "Cancel" then
+    error number -128
+end if
+APPLESCRIPT
+
+if [ $? -ne 0 ]; then
+    exit 0
+fi
+
+# Perform uninstallation
+if [ -f "$PLIST_PATH" ]; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    rm "$PLIST_PATH"
+fi
+
+if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+fi
+
+# Success dialog
+osascript << 'APPLESCRIPT'
+display dialog "✅ Eyes uninstalled successfully!
+
+Eyes has been completely removed from your system." buttons {"OK"} default button "OK" with title "Eyes Uninstaller" with icon note
+APPLESCRIPT
+
+EOF
+
+# Create command-line uninstaller
+cat > "$DIST_DIR/uninstall" << 'EOF'
+#!/bin/sh -eu
+
+# Eyes - Eye Break Reminder Uninstaller
+
+INSTALL_DIR="$HOME/.local/share/eyes"
+PLIST_PATH="$HOME/Library/LaunchAgents/com.eyes.plist"
+
+echo "Uninstalling Eyes Eye Break Reminder..."
+
+# Stop and remove launch agent
+if [ -f "$PLIST_PATH" ]; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    rm "$PLIST_PATH"
+fi
+
+# Remove installed files
+if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+fi
+
+echo "✅ Eyes uninstalled successfully!"
+EOF
+
+# Make all scripts executable
+chmod +x "$DIST_DIR/install-gui" "$DIST_DIR/install" "$DIST_DIR/uninstall-gui" "$DIST_DIR/uninstall"
+
+# Create README
+cat > "$DIST_DIR/README.txt" << EOF
+Eyes - Eye Break Reminder v$VERSION
+
+A simple eye break reminder that follows the 20-20-20 rule:
+Every 20 minutes, look at something 20 feet away for 20 seconds.
+
+INSTALLATION OPTIONS:
+
+GUI Installation (Recommended):
+1. Double-click "install-gui" in Finder
+2. Follow the on-screen instructions
+
+Command Line Installation:
+1. Open Terminal and navigate to this folder
+2. Run: ./install
+
+USAGE:
+Eyes runs silently in the background and shows notifications every 20 minutes.
+
+CONTROL:
+After installation, you can control Eyes using commands in:
+~/.local/share/eyes/eyes-control
+
+UNINSTALL:
+- GUI: Double-click "uninstall-gui"  
+- Command line: Run ./uninstall
+
+REQUIREMENTS:
+- macOS 10.15 or later
+- Python 3 (included with macOS)
+
+For support: https://github.com/justanotherdot/eyes
+EOF
+
+# Clean up
+rm eyes.pex
+
+echo "✅ GUI installer package created: $DIST_DIR/"
+echo ""
+echo "To test:"
+echo "  cd $DIST_DIR"
+echo "  Double-click 'install-gui' in Finder"
+echo ""
+echo "To distribute:"
+echo "  tar -czf eyes-gui-$VERSION.tar.gz $DIST_DIR"
+echo "  or create a .dmg with: hdiutil create -srcfolder $DIST_DIR eyes-$VERSION.dmg"

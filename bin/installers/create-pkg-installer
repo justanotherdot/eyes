@@ -1,0 +1,298 @@
+#!/bin/sh -eu
+
+# Create a proper macOS installer package (.pkg)
+
+PKG_NAME="Eyes"
+VERSION="1.0.0"
+IDENTIFIER="com.eyes.installer"
+BUILD_DIR="build-pkg"
+PAYLOAD_DIR="$BUILD_DIR/payload"
+SCRIPTS_DIR="$BUILD_DIR/scripts"
+
+echo "Creating professional macOS installer package..."
+
+# Clean previous build
+rm -rf "$BUILD_DIR" eyes.pex *.pkg 2>/dev/null || true
+
+# Create pex
+echo "Building pex executable..."
+uv run pex . -e eyes.cli:entry_point -o eyes.pex --python-shebang '/usr/bin/env python3'
+
+# Create build directories
+mkdir -p "$PAYLOAD_DIR/usr/local/share/eyes"
+mkdir -p "$SCRIPTS_DIR"
+
+# Copy files to payload
+cp eyes.pex "$PAYLOAD_DIR/usr/local/share/eyes/"
+cp bin/eyes-control "$PAYLOAD_DIR/usr/local/share/eyes/"
+chmod +x "$PAYLOAD_DIR/usr/local/share/eyes/eyes-control"
+
+# Create postinstall script
+cat > "$SCRIPTS_DIR/postinstall" << 'EOF'
+#!/bin/sh
+
+# Post-installation script for Eyes
+
+INSTALL_DIR="/usr/local/share/eyes"
+PLIST_DIR="$HOME/Library/LaunchAgents"
+PLIST_PATH="$PLIST_DIR/com.eyes.plist"
+
+# Create LaunchAgent for current user
+mkdir -p "$PLIST_DIR"
+
+cat > "$PLIST_PATH" << PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eyes</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>$INSTALL_DIR/eyes.pex</string>
+        <string>--interval</string>
+        <string>20</string>
+    </array>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>StandardOutPath</key>
+    <string>/tmp/eyes.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/tmp/eyes.log</string>
+</dict>
+</plist>
+PLIST_EOF
+
+# Load launch agent
+launchctl load "$PLIST_PATH" 2>/dev/null || true
+
+# Create symlink for easy access
+mkdir -p /usr/local/bin
+ln -sf "$INSTALL_DIR/eyes-control" /usr/local/bin/eyes-control 2>/dev/null || true
+
+echo "Eyes has been installed and started successfully!"
+echo "Use 'eyes-control show' to test the notification system."
+
+exit 0
+EOF
+
+# Create preinstall script
+cat > "$SCRIPTS_DIR/preinstall" << 'EOF'
+#!/bin/sh
+
+# Pre-installation script - stop existing service if running
+
+PLIST_PATH="$HOME/Library/LaunchAgents/com.eyes.plist"
+
+if [ -f "$PLIST_PATH" ]; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+fi
+
+exit 0
+EOF
+
+chmod +x "$SCRIPTS_DIR/postinstall" "$SCRIPTS_DIR/preinstall"
+
+# Create Distribution.xml for productbuild
+cat > "$BUILD_DIR/Distribution.xml" << EOF
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Eyes - Eye Break Reminder</title>
+    <organization>com.eyes</organization>
+    <domains enable_localSystem="true"/>
+    <options customize="never" require-scripts="false" rootVolumeOnly="true" />
+    
+    <welcome file="welcome.html"/>
+    <conclusion file="conclusion.html"/>
+    
+    <pkg-ref id="$IDENTIFIER"/>
+    <options customize="never" require-scripts="false"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="$IDENTIFIER"/>
+        </line>
+    </choices-outline>
+    
+    <choice id="default"/>
+    <choice id="$IDENTIFIER" visible="false">
+        <pkg-ref id="$IDENTIFIER"/>
+    </choice>
+    
+    <pkg-ref id="$IDENTIFIER" version="$VERSION" onConclusion="none">eyes-component.pkg</pkg-ref>
+</installer-gui-script>
+EOF
+
+# Create welcome page
+cat > "$BUILD_DIR/welcome.html" << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; }
+        h1 { color: #1d4ed8; }
+        .rule { background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>👁️ Eyes - Eye Break Reminder</h1>
+    
+    <p>Welcome to Eyes, a simple eye break reminder that helps protect your vision while working on your computer.</p>
+    
+    <div class="rule">
+        <h3>The 20-20-20 Rule</h3>
+        <p>Every <strong>20 minutes</strong>, look at something <strong>20 feet away</strong> for <strong>20 seconds</strong>.</p>
+    </div>
+    
+    <p>Eyes will:</p>
+    <ul>
+        <li>Run quietly in the background</li>
+        <li>Send gentle notifications every 20 minutes</li>
+        <li>Start automatically when you log in</li>
+        <li>Require no ongoing maintenance</li>
+    </ul>
+    
+    <p>Click <strong>Continue</strong> to install Eyes on your system.</p>
+</body>
+</html>
+EOF
+
+# Create conclusion page
+cat > "$BUILD_DIR/conclusion.html" << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; }
+        h1 { color: #059669; }
+        .command { background: #f3f4f6; padding: 8px 12px; border-radius: 4px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>✅ Installation Complete!</h1>
+    
+    <p>Eyes has been successfully installed and is now running in the background.</p>
+    
+    <p>You should receive your first eye break reminder in 20 minutes.</p>
+    
+    <h3>Control Commands</h3>
+    <p>You can control Eyes from Terminal:</p>
+    <ul>
+        <li><span class="command">eyes-control show</span> - Show immediate reminder</li>
+        <li><span class="command">eyes-control stop</span> - Stop the service</li>
+        <li><span class="command">eyes-control status</span> - Check if running</li>
+    </ul>
+    
+    <h3>Uninstalling</h3>
+    <p>To uninstall Eyes, drag the <strong>Eyes Uninstaller</strong> from Applications to run it, or use:</p>
+    <p><span class="command">sudo /usr/local/share/eyes/uninstall</span></p>
+    
+    <p><strong>Thank you for using Eyes!</strong> Your vision health is important.</p>
+</body>
+</html>
+EOF
+
+# Build component package
+echo "Building component package..."
+pkgbuild --root "$PAYLOAD_DIR" \
+         --scripts "$SCRIPTS_DIR" \
+         --identifier "$IDENTIFIER" \
+         --version "$VERSION" \
+         --install-location "/" \
+         "$BUILD_DIR/eyes-component.pkg"
+
+# Build final installer package
+echo "Building installer package..."
+productbuild --distribution "$BUILD_DIR/Distribution.xml" \
+             --package-path "$BUILD_DIR" \
+             --resources "$BUILD_DIR" \
+             "$PKG_NAME-$VERSION.pkg"
+
+# Create uninstaller app (simple script packaged as app)
+UNINSTALLER_DIR="$PKG_NAME Uninstaller.app"
+mkdir -p "$UNINSTALLER_DIR/Contents/MacOS"
+
+cat > "$UNINSTALLER_DIR/Contents/Info.plist" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>uninstall</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.eyes.uninstaller</string>
+    <key>CFBundleName</key>
+    <string>Eyes Uninstaller</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+</dict>
+</plist>
+EOF
+
+cat > "$UNINSTALLER_DIR/Contents/MacOS/uninstall" << 'EOF'
+#!/bin/sh
+
+# Eyes Uninstaller
+
+# Show confirmation dialog
+osascript << 'APPLESCRIPT'
+display dialog "Are you sure you want to uninstall Eyes?
+
+This will:
+• Stop the background service
+• Remove all Eyes files  
+• Remove automatic startup
+
+You can reinstall Eyes anytime." buttons {"Cancel", "Uninstall"} default button "Cancel" with title "Eyes Uninstaller" with icon caution
+
+if button returned of result is "Cancel" then
+    error number -128
+end if
+APPLESCRIPT
+
+if [ $? -ne 0 ]; then
+    exit 0
+fi
+
+# Uninstall
+PLIST_PATH="$HOME/Library/LaunchAgents/com.eyes.plist"
+
+if [ -f "$PLIST_PATH" ]; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    rm "$PLIST_PATH"
+fi
+
+sudo rm -rf /usr/local/share/eyes 2>/dev/null || true
+sudo rm -f /usr/local/bin/eyes-control 2>/dev/null || true
+
+# Success dialog
+osascript << 'APPLESCRIPT'
+display dialog "✅ Eyes uninstalled successfully!
+
+Eyes has been completely removed from your system." buttons {"OK"} default button "OK" with title "Eyes Uninstaller" with icon note
+APPLESCRIPT
+
+EOF
+
+chmod +x "$UNINSTALLER_DIR/Contents/MacOS/uninstall"
+
+# Clean up
+rm -rf "$BUILD_DIR" eyes.pex
+
+echo "✅ Professional installer package created!"
+echo ""
+echo "Files created:"
+echo "  📦 $PKG_NAME-$VERSION.pkg - Double-click to install"
+echo "  🗑️  $PKG_NAME Uninstaller.app - Double-click to uninstall"
+echo ""
+echo "The .pkg file will show a proper macOS installer GUI when double-clicked."
